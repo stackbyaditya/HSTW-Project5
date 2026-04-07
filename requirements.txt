@@ -9,3 +9,4 @@ pytest
 scikit-learn
 uvicorn
 xgboost
+httpx==0.26.0
