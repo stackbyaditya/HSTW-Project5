@@ -31,6 +31,26 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+## Deployment on Render
+
+- **Root Directory**: `frontend`
+- **Build Command**:
+
+```bash
+pip install -r requirements.txt
+```
+
+- **Start Command**:
+
+```bash
+streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+```
+
+Notes:
+
+- The backend API is already deployed; this frontend only consumes it.
+- On Render, the first request can be slow due to cold start / waking up.
+
 ## API Information
 
 - Base URL: `https://fraud-detection-api-wb1m.onrender.com`

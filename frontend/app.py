@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import hashlib
 import ipaddress
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -12,6 +14,28 @@ import requests
 import streamlit as st
 
 from utils import predict
+
+APP_MAP = {
+    101: "Chrome",
+    202: "Safari",
+    303: "Firefox",
+}
+
+OS_MAP = {
+    13: "Windows",
+    17: "Android",
+    19: "iOS",
+}
+
+DEVICE_MAP = {
+    1: "Mobile",
+    2: "Desktop",
+}
+
+CHANNEL_MAP = {
+    497: "Google Ads",
+    130: "Facebook Ads",
+}
 
 
 def _inject_styles() -> None:
@@ -30,14 +54,35 @@ def _inject_styles() -> None:
             box-shadow: 0 12px 28px rgba(2, 6, 23, 0.35);
             margin-bottom: 1rem;
         }
+        .summary-card {
+            padding: 0.7rem 0.9rem 0.25rem 0.9rem;
+        }
         .hero-title {
-            font-size: 1.65rem;
-            font-weight: 700;
-            margin-bottom: 0.3rem;
+            text-align: center;
+            font-size: 2.1rem;
+            font-weight: 800;
+            margin-bottom: 0.35rem;
+            background: linear-gradient(90deg, #38bdf8 0%, #818cf8 45%, #f472b6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         .hero-subtitle {
+            text-align: center;
             color: #cbd5e1;
             margin-bottom: 0;
+        }
+        .ad-shell {
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 10px 24px rgba(2, 6, 23, 0.45);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            margin-bottom: 0.65rem;
+        }
+        .ad-note {
+            color: #cbd5e1;
+            font-size: 0.93rem;
+            margin-top: 0.2rem;
         }
         div[data-testid="stButton"] > button {
             width: 100%;
@@ -45,6 +90,12 @@ def _inject_styles() -> None:
             border-radius: 12px;
             border: 1px solid rgba(147, 197, 253, 0.60);
             font-weight: 700;
+        }
+        hr.premium-divider {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, rgba(148,163,184,0.1), rgba(148,163,184,0.8), rgba(148,163,184,0.1));
+            margin: 1rem 0 1.2rem 0;
         }
         </style>
         """,
@@ -55,11 +106,11 @@ def _inject_styles() -> None:
 def _browser_to_app_code(user_agent: str) -> tuple[int, str]:
     normalized = user_agent.lower()
     mapping = [
-        ("edg", 103, "Edge"),
+        ("edg", 101, "Chrome"),
         ("chrome", 101, "Chrome"),
-        ("firefox", 102, "Firefox"),
-        ("safari", 104, "Safari"),
-        ("opera", 105, "Opera"),
+        ("firefox", 303, "Firefox"),
+        ("safari", 202, "Safari"),
+        ("opera", 303, "Firefox"),
     ]
     for token, code, label in mapping:
         if token in normalized:
@@ -162,21 +213,39 @@ st.set_page_config(
 _inject_styles()
 _initialize_state()
 
+st.caption("Frontend running successfully")
+
 st.markdown(
     """
     <div class="hero-card">
-        <div class="hero-title">🚨 Ad Click Fraud Detection System</div>
-        <p class="hero-subtitle">Detect whether a click is Human or Bot using ML.</p>
+        <h1 class="hero-title">🚨 Ad Click Fraud Detection System</h1>
+        <p class="hero-subtitle">Detect whether a click is Human or Bot using ML</p>
     </div>
     """,
     unsafe_allow_html=True,
 )
+st.markdown("<hr class='premium-divider'>", unsafe_allow_html=True)
 st.caption("Use the sidebar for optional feature controls (Device, OS, Channel).")
 
 st.sidebar.header("Optional Feature Controls")
-device_value = st.sidebar.number_input("Device", min_value=0, value=1, step=1)
-os_value = st.sidebar.number_input("OS", min_value=0, value=13, step=1)
-channel_value = st.sidebar.number_input("Channel", min_value=0, value=497, step=1)
+device_value = st.sidebar.selectbox(
+    "Device",
+    options=list(DEVICE_MAP.keys()),
+    index=0,
+    format_func=lambda x: DEVICE_MAP.get(x, f"Unknown ({x})"),
+)
+os_value = st.sidebar.selectbox(
+    "Operating System",
+    options=list(OS_MAP.keys()),
+    index=0,
+    format_func=lambda x: OS_MAP.get(x, f"Unknown ({x})"),
+)
+channel_value = st.sidebar.selectbox(
+    "Ad Channel",
+    options=list(CHANNEL_MAP.keys()),
+    index=0,
+    format_func=lambda x: CHANNEL_MAP.get(x, f"Unknown ({x})"),
+)
 st.sidebar.markdown("---")
 st.sidebar.subheader("About Project")
 st.sidebar.info(
@@ -187,13 +256,29 @@ st.markdown(
     """
     <div class="glass-card">
         <h4 style="margin-top:0;">Sponsored Ad</h4>
-        <p style="margin-bottom:0.2rem;">Click this ad to generate a real click event timestamp.</p>
+        <p style="margin-bottom:0.2rem;">Interact with this ad to generate a real click event timestamp.</p>
     </div>
     """,
     unsafe_allow_html=True,
 )
+st.markdown('<div class="ad-shell">', unsafe_allow_html=True)
+ad_image_path = Path("assets") / "ad_banner.png"
+try:
+    if ad_image_path.exists():
+        # Backward-compatible across Streamlit versions (older versions don't support use_container_width)
+        st.image(str(ad_image_path), use_column_width=True)
+    else:
+        st.info("Ad banner image not found. Click the CTA below to simulate a click event.")
+except Exception:
+    st.info("Ad banner image could not be loaded. Click the CTA below to simulate a click event.")
+st.markdown("</div>", unsafe_allow_html=True)
+st.markdown(
+    "<p class='ad-note'>Sponsored placement preview. Click the CTA below to simulate a click event.</p>",
+    unsafe_allow_html=True,
+)
+st.markdown("<br>", unsafe_allow_html=True)
 
-if st.button("🖱️ Tap This Ad To Generate Click Event", use_container_width=True):
+if st.button("🖱️ Click Ad - Learn More", use_container_width=True):
     current_ts = datetime.now()
     st.session_state.ad_clicked = True
     st.session_state.click_timestamp = current_ts
@@ -205,26 +290,26 @@ if not st.session_state.ad_clicked:
     st.warning("Generate a click event first by tapping the ad card above.")
 
 summary_payload = {
-    "ip": int(st.session_state.ip_value),
-    "app": int(st.session_state.app_value),
-    "device": int(device_value),
-    "os": int(os_value),
-    "channel": int(channel_value),
+    "IP (Auto-detected)": st.session_state.ip_label,
+    "Browser/App": APP_MAP.get(int(st.session_state.app_value), st.session_state.app_label),
+    "Device": DEVICE_MAP.get(int(device_value), f"Unknown ({int(device_value)})"),
+    "OS": OS_MAP.get(int(os_value), f"Unknown ({int(os_value)})"),
+    "Channel": CHANNEL_MAP.get(int(channel_value), f"Unknown ({int(channel_value)})"),
     "click_date": st.session_state.formatted_click_date,
     "click_time": st.session_state.formatted_click_time,
 }
 
 st.markdown(
     """
-    <div class="glass-card">
+    <div class="glass-card summary-card">
         <h4 style="margin-top:0;">Session Summary (Read-Only)</h4>
     </div>
     """,
     unsafe_allow_html=True,
 )
 st.dataframe(pd.DataFrame([summary_payload]), use_container_width=True, hide_index=True)
-st.caption(f"IP source: {st.session_state.ip_label}")
-st.caption(f"Browser/App source: {st.session_state.app_label}")
+st.caption("Encoded feature values are preserved for model payload compatibility.")
+st.markdown("<br>", unsafe_allow_html=True)
 
 predict_clicked = st.button("🔍 Predict Fraud", type="primary", use_container_width=True)
 
