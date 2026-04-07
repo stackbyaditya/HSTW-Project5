@@ -1,0 +1,37 @@
+# Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE and OS files
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store
+
+# Local model and output artifacts
+models/
+outputs/
+data/processed/
+
+# Dataset files
+data/train.csv
+data/train_sample.csv
+data/test_supplement.csv
+data/sample_submission.csv
+
+# Environment configuration
+.env

@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Preprocess and train when sample data exists
+        run: |
+          if [ -f data/train_sample.csv ]; then
+            python src/preprocess.py
+            python src/train.py
+            python src/visualize.py
+          else
+            echo "Sample dataset not available. Skipping preprocessing, training, and artifact generation."
+          fi
+
+      - name: Run tests when model artifacts are available
+        run: |
+          if [ -f models/best_model.pkl ] && [ -f models/encoders.joblib ] && [ -f models/metadata.joblib ]; then
+            python -m pytest tests/ -v
+          else
+            echo "Model artifacts are unavailable. Skipping API tests in CI."
+          fi
+
+      - name: Build Docker image
+        run: docker build -t fraud-api .
