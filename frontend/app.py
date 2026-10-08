@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import hashlib
 import ipaddress
 from datetime import datetime
@@ -13,7 +14,18 @@ import pandas as pd
 import requests
 import streamlit as st
 
-from utils import predict
+FRONTEND_DIR = Path(__file__).resolve().parent
+if str(FRONTEND_DIR) not in sys.path:
+    sys.path.insert(0, str(FRONTEND_DIR))
+
+from utils import predict  # noqa: E402
+
+st.set_page_config(
+    page_title="Fraud Detection System",
+    page_icon="🚨",
+    layout="centered",
+    initial_sidebar_state="collapsed",
+)
 
 APP_MAP = {
     101: "Chrome",
@@ -36,6 +48,8 @@ CHANNEL_MAP = {
     497: "Google Ads",
     130: "Facebook Ads",
 }
+
+AD_BANNER_PATH = FRONTEND_DIR / "assets" / "ad_banner.png"
 
 
 def _inject_styles() -> None:
@@ -128,7 +142,7 @@ def _detect_ip_as_int() -> tuple[int, str]:
         ip_object = ipaddress.ip_address(ip_text)
         if ip_object.version == 4:
             return int(ip_object), f"{ip_text} (auto-detected)"
-        hashed_value = int(hashlib.sha256(ip_text.encode("utf-8")).hexdigest()[:12], 16)
+        hashed_value = int(hashlib.sha256(ip_text.encode("utf-8")).hexdigest()[:8], 16)
         return hashed_value, f"{ip_text} (auto-detected, hashed)"
     except Exception:
         fallback_ip = 87540
@@ -137,10 +151,17 @@ def _detect_ip_as_int() -> tuple[int, str]:
 
 def _extract_user_agent() -> str:
     try:
-        headers = dict(st.context.headers) if st.context and st.context.headers else {}
+        if hasattr(st, "context") and st.context and hasattr(st.context, "headers") and st.context.headers:
+            headers = dict(st.context.headers)
+        else:
+            headers = {}
     except Exception:
         headers = {}
-    return str(headers.get("User-Agent", "")).strip()
+
+    for key in ("user-agent", "User-Agent", "USER-AGENT"):
+        if key in headers and headers[key]:
+            return str(headers[key]).strip()
+    return ""
 
 
 def _initialize_state() -> None:
@@ -203,13 +224,6 @@ def _parse_prediction_response(response_data: dict[str, Any]) -> tuple[bool, flo
     return is_fraud, probability_value, model_name
 
 
-st.set_page_config(
-    page_title="Fraud Detection System",
-    page_icon="🚨",
-    layout="centered",
-    initial_sidebar_state="collapsed",
-)
-
 _inject_styles()
 _initialize_state()
 
@@ -262,15 +276,18 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown('<div class="ad-shell">', unsafe_allow_html=True)
-ad_image_path = Path("assets") / "ad_banner.png"
+ad_image_path = AD_BANNER_PATH
 try:
     if ad_image_path.exists():
-        # Backward-compatible across Streamlit versions (older versions don't support use_container_width)
-        st.image(str(ad_image_path), use_column_width=True)
+        try:
+            st.image(str(ad_image_path), use_container_width=True)
+        except TypeError:
+            st.image(str(ad_image_path), use_column_width=True)
     else:
         st.info("Ad banner image not found. Click the CTA below to simulate a click event.")
 except Exception:
     st.info("Ad banner image could not be loaded. Click the CTA below to simulate a click event.")
+
 st.markdown("</div>", unsafe_allow_html=True)
 st.markdown(
     "<p class='ad-note'>Sponsored placement preview. Click the CTA below to simulate a click event.</p>",

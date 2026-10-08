@@ -2,7 +2,7 @@
 
 ## Project Title
 
-TalkingData Ad Fraud Detection pipeline with preprocessing, feature engineering, multi-model training, model evaluation, FastAPI inference, testing, Docker packaging, CI automation, and Render-ready deployment settings.
+TalkingData Ad Fraud Detection pipeline with preprocessing, feature engineering, multi-model training, model evaluation, FastAPI inference, Streamlit interactive frontend, automated pytest suite, Docker packaging, CI automation, and Render/Streamlit Cloud/Vercel deployment configurations.
 
 ## Problem Statement
 
@@ -26,13 +26,39 @@ Additional files in the repository include `data/test_supplement.csv` for unlabe
 
 ## Architecture Overview
 
-1. `src/preprocess.py` loads `data/train_sample.csv`, applies memory-efficient dtypes, extracts datetime features, builds aggregation features, label-encodes categorical columns, and saves processed artifacts.
-2. `src/train.py` trains Logistic Regression, Random Forest, XGBoost, and LightGBM on the processed dataset, evaluates them on a stratified validation split, selects a champion model, and stores metadata.
-3. `src/evaluate.py` prints a clean comparison table for all trained models.
-4. `src/visualize.py` recreates the validation split, scores the champion model, and saves plots plus a metrics JSON file.
-5. `src/predict.py` loads the saved model and encoders to score single records.
-6. `api/main.py` serves the model through FastAPI with startup-time artifact loading.
-7. `tests/test_api.py` validates the health and prediction endpoints.
+```text
+User / Browser
+      │
+      ▼
+Streamlit Frontend (Host: Streamlit Community Cloud / Render / Railway)
+      │
+      ▼ HTTPS POST /predict (Configurable via FRAUD_API_URL)
+FastAPI Backend API (Host: Render Docker / Vercel Serverless / Container)
+      │
+      ▼
+ML Model & Pipeline (XGBoost Champion Model)
+```
+
+1. **Preprocessing (`src/preprocess.py`)**: Loads `data/train_sample.csv`, applies memory-efficient dtypes, extracts datetime features (`hour`, `day`, `weekday`, `minute`), builds aggregation features (`clicks_per_ip`, `clicks_per_channel`, etc.), label-encodes categorical columns, and saves processed artifacts.
+2. **Model Training (`src/train.py`)**: Trains Logistic Regression, Random Forest, XGBoost, and LightGBM models on the processed dataset, evaluates them on a stratified validation split, selects the champion model, and stores model binaries + metadata in `models/`.
+3. **Model Evaluation (`src/evaluate.py`)**: Displays comparison metrics across all trained models.
+4. **Visualization (`src/visualize.py`)**: Scores the champion model on validation data and generates confusion matrix, ROC curve, and feature importance plots in `outputs/`.
+5. **Inference (`src/predict.py`)**: Scores individual click payloads using loaded model artifacts.
+6. **FastAPI Backend (`api/main.py`)**: Serves prediction endpoints (`/` health check and `/predict`) with CORS support and lifespan model loading.
+7. **Streamlit Frontend (`frontend/app.py`)**: Renders an interactive web application allowing users to simulate click events, auto-detect client metadata (IP/User-Agent), customize input features, and view real-time fraud predictions.
+8. **Automated Testing (`tests/`)**: Pytest suite validating backend health/prediction endpoints and frontend utility error-handling mechanisms.
+
+## Deployment Architecture Strategy
+
+The application consists of two decoupled components:
+
+1. **FastAPI Backend**:
+   - Long-running REST service deployed via Docker container on **Render** (or Vercel Serverless Function via `api/main.py`).
+   - Exposes `/` and `/predict` endpoints with CORS enabled.
+2. **Streamlit Frontend**:
+   - Reactive WebSocket application built with Streamlit.
+   - Deployable on **Streamlit Community Cloud**, **Render Web Service**, **Hugging Face Spaces**, or **Railway**.
+   - Note: Streamlit applications require persistent WebSocket connections and cannot run as stateless serverless HTTP functions. `.vercelignore` and `vercel.json` are included to ensure Vercel does not misidentify `frontend/app.py` as a serverless function when linking the repository.
 
 ## Features Engineered
 
@@ -57,7 +83,7 @@ Additional files in the repository include `data/test_supplement.csv` for unlabe
 - XGBoost
 - LightGBM
 
-Class imbalance is handled with `class_weight="balanced"` for sklearn models and `scale_pos_weight` for boosting models.
+Class imbalance is handled with `class_weight="balanced"` for scikit-learn models and `scale_pos_weight` for boosting models.
 
 ## Results
 
@@ -65,12 +91,12 @@ Champion model: `XGBoost`
 
 Validation metrics from `outputs/metrics.json`:
 
-- AUC: `0.9757777220969402`
-- Log Loss: `0.022477393390349744`
+- AUC: `0.975777`
+- Log Loss: `0.022477`
 - Accuracy: `0.99345`
-- Precision: `0.21333333333333335`
-- Recall: `0.7111111111111111`
-- F1 Score: `0.3282051282051282`
+- Precision: `0.213333`
+- Recall: `0.711111`
+- F1 Score: `0.328205`
 
 Artifacts:
 
@@ -121,7 +147,7 @@ Response:
 pip install -r requirements.txt
 ```
 
-2. Run the pipeline:
+2. Run the pipeline (optional, pre-built artifacts exist in `models/`):
 
 ```bash
 python src/preprocess.py
@@ -130,21 +156,34 @@ python src/evaluate.py
 python src/visualize.py
 ```
 
-3. Start the API:
+3. Start the FastAPI backend API:
 
 ```bash
 uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
-4. Run tests:
+4. Start the Streamlit frontend app (in a second terminal):
+
+```bash
+streamlit run frontend/app.py
+```
+
+5. Run test suite:
 
 ```bash
 python -m pytest tests/ -v
 ```
 
+## Environment Variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `PORT` | Port for FastAPI backend service | `8000` |
+| `FRAUD_API_URL` | Base URL of the backend API for Streamlit frontend | `https://fraud-detection-api-wb1m.onrender.com` |
+
 ## Docker Instructions
 
-Build the image:
+Build the backend image:
 
 ```bash
 docker build -t fraud-api .
@@ -153,13 +192,7 @@ docker build -t fraud-api .
 Run the container:
 
 ```bash
-docker run -p 8000:8000 fraud-api
-```
-
-The container starts the API with:
-
-```bash
-uvicorn api.main:app --host 0.0.0.0 --port 8000
+docker run -p 8000:8000 -e PORT=8000 fraud-api
 ```
 
 ## CI/CD Explanation
@@ -169,29 +202,22 @@ The GitHub Actions workflow in `.github/workflows/ci.yml`:
 - installs Python dependencies
 - preprocesses and trains when `data/train_sample.csv` is present
 - generates plots and metrics artifacts
-- runs the API tests only when model artifacts are available
-- builds the Docker image
+- runs the API & frontend unit test suite
+- builds the Docker container image
 
-This keeps CI resilient when dataset files are intentionally absent from the repository.
+## Deployment Instructions
 
-## Deployment (Render)
+### Option 1: Deploy Frontend to Streamlit Community Cloud (Recommended)
+1. Fork or connect this GitHub repository to [Streamlit Community Cloud](https://share.streamlit.io/).
+2. Set Main file path to: `frontend/app.py`.
+3. Add Environment Variable:
+   - `FRAUD_API_URL`: `https://fraud-detection-api-wb1m.onrender.com` (or your deployed backend URL).
 
-The project is Render-ready through:
+### Option 2: Deploy Both Backend and Frontend to Render
+`render.yaml` contains pre-configured web service definitions for both components:
+- `fraud-api`: Docker web service for FastAPI backend.
+- `fraud-frontend`: Native Python web service running `streamlit run frontend/app.py`.
 
-- `api/main.py` reading `PORT` with a fallback to `8000`
-- `render.yaml` configured for Docker deployment
-- the Docker image exposing the FastAPI application
-
-Render start behavior is compatible with:
-
-```bash
-uvicorn api.main:app --host 0.0.0.0 --port $PORT
-```
-
-## Future Improvements
-
-- add real external test labels for a proper holdout evaluation
-- replace fallback aggregation values in inference with online feature store lookups
-- add model monitoring and drift alerts
-- version training artifacts with a registry
-- extend tests to cover missing-artifact and validation-error flows
+### Option 3: Deploy Backend to Render / Vercel Serverless
+- Backend FastAPI app is configured in `render.yaml` (Render Docker) and `vercel.json` (Vercel Python Serverless Function targeting `api/main.py`).
+- `.vercelignore` ignores `frontend/` so Vercel does not misidentify `frontend/app.py` as a serverless HTTP endpoint.

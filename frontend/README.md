@@ -1,76 +1,65 @@
 # Streamlit Frontend for Ad Click Fraud Detection
 
-This frontend provides a clean Streamlit interface to collect click features and call the deployed fraud detection API for real-time predictions.
+This frontend provides an interactive Streamlit user interface to capture click features, auto-detect client metadata (IP address and User-Agent browser tokens), and call the deployed FastAPI fraud detection API for real-time inference.
 
 ## Features
 
-- Sidebar-based form inputs for click metadata
-- Deployed API integration through a dedicated utility module
-- Prediction result display with clear fraud/legitimate status
-- Probability visualization using percentage, metric, and progress bar
-- Input summary table for quick verification
-- Graceful handling of timeout, network, HTTP, and invalid-response errors
+- Dynamic hero banner and custom dark-theme styling
+- Interactive sponsored ad click simulator capturing click timestamps
+- Automatic client IP detection (`api.ipify.org` fallback) and browser user-agent mapping
+- Sidebar feature controls for optional attributes (Device, Operating System, Ad Channel)
+- Real-time API communication with graceful error handling (cold start timeouts, connection errors, HTTP status errors)
+- Probability metric display and progress bar visualization
 
 ## Setup and Run
 
-1. Move to frontend directory:
+1. Install dependencies from workspace root:
+
+```bash
+pip install -r frontend/requirements.txt
+```
+
+2. Start the Streamlit app:
+
+```bash
+streamlit run frontend/app.py
+```
+
+Or from inside the `frontend/` directory:
 
 ```bash
 cd frontend
-```
-
-2. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-3. Start Streamlit app:
-
-```bash
 streamlit run app.py
 ```
 
-## Deployment on Render
+## Environment Variables
 
-- **Root Directory**: `frontend`
-- **Build Command**:
+| Variable | Description | Default Value |
+|---|---|---|
+| `FRAUD_API_URL` | Base URL of the backend API | `https://fraud-detection-api-wb1m.onrender.com` |
 
-```bash
-pip install -r requirements.txt
-```
-
-- **Start Command**:
+To connect the frontend to a local backend API during development:
 
 ```bash
-streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+FRAUD_API_URL=http://127.0.0.1:8000 streamlit run frontend/app.py
 ```
 
-Notes:
+## Deployment Options
 
-- The backend API is already deployed; this frontend only consumes it.
-- On Render, the first request can be slow due to cold start / waking up.
+### 1. Streamlit Community Cloud (Recommended)
 
-## API Information
+- **Repository**: Select `stackbyaditya/HSTW-Project5`
+- **Branch**: `main`
+- **Main file path**: `frontend/app.py`
+- **Secrets / Environment Variables**:
+  - `FRAUD_API_URL`: `https://fraud-detection-api-wb1m.onrender.com`
 
-- Base URL: `https://fraud-detection-api-wb1m.onrender.com`
-- Endpoint: `POST /predict`
-- Full endpoint URL: `https://fraud-detection-api-wb1m.onrender.com/predict`
-- API docs: `https://fraud-detection-api-wb1m.onrender.com/docs`
+### 2. Render Deployment
 
-Expected request payload format:
+- **Root Directory**: `.`
+- **Build Command**: `pip install -r frontend/requirements.txt`
+- **Start Command**: `streamlit run frontend/app.py --server.port $PORT --server.address 0.0.0.0`
 
-```json
-{
-  "ip": 87540,
-  "app": 12,
-  "device": 1,
-  "os": 13,
-  "channel": 497,
-  "click_time": "2017-11-07 09:30:38"
-}
-```
+### 3. Vercel Note
 
-## Cold Start Note
-
-This service is deployed on Render. If the app has been idle, the first request can time out while the backend wakes up. Retry after a few seconds if you see a timeout message.
+Streamlit requires continuous long-running WebSocket connections and cannot run as a stateless Vercel Serverless Function. `.vercelignore` and `vercel.json` are included in the repository root so Vercel ignores `frontend/app.py` and avoids build failures. Host the Streamlit frontend on Streamlit Community Cloud or Render Web Services.

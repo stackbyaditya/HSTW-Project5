@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import requests
 
-BASE_URL = "https://fraud-detection-api-wb1m.onrender.com"
+DEFAULT_BASE_URL = "https://fraud-detection-api-wb1m.onrender.com"
+BASE_URL = os.environ.get("FRAUD_API_URL", DEFAULT_BASE_URL).rstrip("/")
 PREDICT_ENDPOINT = f"{BASE_URL}/predict"
 REQUEST_TIMEOUT_SECONDS = 15
 
@@ -29,10 +31,12 @@ def predict(data: dict[str, Any]) -> dict[str, Any]:
             "error": "connection_error",
         }
     except requests.exceptions.HTTPError as exc:
+        status_code = getattr(exc.response, "status_code", None)
+        error_msg = f"http_error ({status_code}): {exc}" if status_code else f"http_error: {exc}"
         return {
             "success": False,
             "data": None,
-            "error": f"http_error: {exc}",
+            "error": error_msg,
         }
     except requests.exceptions.RequestException as exc:
         return {
@@ -55,3 +59,4 @@ def predict(data: dict[str, Any]) -> dict[str, Any]:
         "data": response_json,
         "error": None,
     }
+
