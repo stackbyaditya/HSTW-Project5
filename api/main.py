@@ -37,14 +37,21 @@ app.add_middleware(
 
 
 @app.get("/", response_model=HealthResponse)
+@app.get("/api", response_model=HealthResponse)
+@app.get("/api/index", response_model=HealthResponse)
+@app.get("/api/main", response_model=HealthResponse)
 def health_check() -> HealthResponse:
     return HealthResponse(status="ok", model_loaded=True)
 
 
 @app.post("/predict", response_model=PredictionResponse)
+@app.post("/api/predict", response_model=PredictionResponse)
+@app.post("/api/index/predict", response_model=PredictionResponse)
+@app.post("/api/main/predict", response_model=PredictionResponse)
 def predict(payload: PredictionRequest, request: Request) -> PredictionResponse:
     prediction = request.app.state.predictor.predict_record(payload.model_dump())
     return PredictionResponse(**prediction)
+
 
 
 if __name__ == "__main__":
